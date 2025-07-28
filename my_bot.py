@@ -1,40 +1,33 @@
 import asyncio
 import logging
+import os # <-- ДОБАВИЛИ ЭТОТ ВАЖНЫЙ ИМПОРТ
+
 import google.generativeai as genai
-
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters.command import Command
-# Важно добавить этот импорт, чтобы бот показывал "Печатает..."
 from aiogram.enums import ChatAction
+from aiogram.filters.command import Command
 
-# Включаем логирование, чтобы видеть, что происходит
 logging.basicConfig(level=logging.INFO)
 
-# --- ВАЖНО: ВСТАВЬ СВОИ ДАННЫЕ НИЖЕ ---
+# --- ИЗМЕНИЛИ ЭТОТ БЛОК ---
+# Теперь ключи берутся из "переменных окружения" сервера
+# Это безопасный способ, чтобы не светить ключи в  коде
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+# -------------------------
 
-# Вставь сюда свой API-ключ от Google AI Studio
-# Никогда не выкладывай этот файл с ключом в открытый доступ!
-GOOGLE_API_KEY = '' 
-
-# Вставь сюда токен твоего бота
-BOT_TOKEN = ''
-
-# --- КОНЕЦ ВАЖНОЙ ЧАСТИ ---
-
-# ... (код выше не меняется)
+# Проверка, что ключи вообще существуют
+if not GOOGLE_API_KEY or not BOT_TOKEN:
+  logging.critical("Ключи GOOGLE_API_KEY или BOT_TOKEN не найдены в окружении!")
+  exit()
 
 # Настраиваем подключение к Gemini
 try:
- genai.configure(api_key=GOOGLE_API_KEY)
- # ИЗМЕНЯЕМ ТОЛЬКО ЭТУ СТРОКУ
- model = genai.GenerativeModel('gemini-1.5-flash')
+  genai.configure(api_key=GOOGLE_API_KEY)
+  model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
- logging.critical(f"Не удалось настроить Gemini API. Проверь ключ. Ошибка: {e}")
- exit()
-
-# ... (остальной код не меняется)
-
-
+  logging.critical(f"Не удалось настроить Gemini API: {e}")
+  exit()
 
 # Объект бота и диспетчер
 bot = Bot(token=BOT_TOKEN)
@@ -43,36 +36,27 @@ dp = Dispatcher()
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
- await message.answer("Привет! Я твой бот-собеседник. Просто напиши мне что-нибудь.")
+  await message.answer("Привет! Я твой бот-собеседник. Просто напиши мне что-нибудь.")
 
-# Этот обработчик будет срабатывать на ЛЮБОЕ текстовое сообщение
+# Обработчик текстовых сообщений
 @dp.message()
 async def handle_text_message(message: types.Message):
- # Проверяем, что сообщение содержит текст, а не стикер или фото
- if not message.text:
-   return
+  if not message.text:
+    return
 
- try:
-  # Показываем пользователю, что мы "печатаем"
-  # Это дает понять, что бот не завис, а думает
-  await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
-
-  # Отправляем текст пользователя в модель Gemini
-  # Используем асинхронную версию, чтобы не блокировать бота
-  response = await model.generate_content_async(message.text)
-
-  # Отправляем ответ от ИИ пользователю
-  await message.answer(response.text)
-
- except Exception as e:
-  logging.error(f"Ошибка при обработке сообщения: {e}")
-  await message.answer("Извините, произошла ошибка при обращении к ИИ. Попробуйте еще раз позже.")
+  try:
+    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+    response = await model.generate_content_async(message.text)
+    await message.answer(response.text)
+  except Exception as e:
+    logging.error(f"Ошибка при обработке сообщения: {e}")
+    await message.answer("Извините, произошла ошибка при обращении к ИИ. Попробуйте еще раз позже.")
 
 async def main():
- # Перед запуском бота, можно вывести в консоль сообщение
- logging.info("Бот запускается...")
- await dp.start_polling(bot)
+  logging.info("Бот запускается...")
+  await dp.start_polling(bot)
 
 if __name__ == "__main__":
- asyncio.run(main())
+  asyncio.run(main())
+
 
