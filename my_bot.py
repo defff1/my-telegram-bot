@@ -1,63 +1,75 @@
-import asyncio
 import logging
-import os # <-- ДОБАВИЛИ ЭТОТ ВАЖНЫЙ ИМПОРТ
-
+import os
 import google.generativeai as genai
-from aiogram import Bot, Dispatcher, types
-from aiogram.enums import ChatAction
-from aiogram.filters.command import Command
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO)
+# Загружаем переменные окружения из файла .env
+load_dotenv()
 
-# --- ИЗМЕНИЛИ ЭТОТ БЛОК ---
-# Теперь ключи берутся из "переменных окружения" сервера
-# Это безопасный способ, чтобы не светить ключи в  коде
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+# Получаем ключи из переменных окружения
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-# -------------------------
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
-# Проверка, что ключи вообще существуют
-if not GOOGLE_API_KEY or not BOT_TOKEN:
-  logging.critical("Ключи GOOGLE_API_KEY или BOT_TOKEN не найдены в окружении!")
-  exit()
+# Настраиваем логирование
+logging.basicConfig(
+ format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+ level=logging.INFO
+)
 
-# Настраиваем подключение к Gemini
-try:
-  genai.configure(api_key=GOOGLE_API_KEY)
-  model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-  logging.critical(f"Не удалось настроить Gemini API: {e}")
-  exit()
+# Настраиваем Gemini API
+genai.configure(api_key=GOOGLE_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+chat = model.start_chat(history=[])
 
-# Объект бота и диспетчер
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+# --- НОВАЯ ВЕРСИЯ КОМАНДЫ /price ---
+async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+ """Отправляет статический прайс-лист."""
+ price_list = (
+  "Прайс-лист на видео:\n\n"
+  "1. Изи видео - 100р\n"
+  "2. Медиум видео - 150р\n"
+  "3. Хард видео - 200р"
+ )
+ await update.message.reply_text(price_list)
 
-# Обработчик команды /start
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-  await message.answer("Привет! Я твой бот-собеседник. Просто напиши мне что-нибудь.")
+# --- Старые команды, которые остаются без изменений ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+ """Отправляет приветственное сообщение при команде /start."""
+ await update.message.reply_text('Привет! Я твой AI-собеседник. Просто напиши мне что-нибудь.')
 
-# Обработчик текстовых сообщений
-@dp.message()
-async def handle_text_message(message: types.Message):
-  if not message.text:
-    return
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+ """Обрабатывает все текстовые сообщения, отправляя их в Gemini."""
+ user_text = update.message.text
+ logging.info(f"Получено сообщение от пользователя: {user_text}")
 
-  try:
-    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
-    response = await model.generate_content_async(message.text)
-    await message.answer(response.text)
-  except Exception as e:
-    logging.error(f"Ошибка при обработке сообщения: {e}")
-    await message.answer("Извините, произошла ошибка при обращении к ИИ. Попробуйте еще раз позже.")
+ await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
 
-async def main():
-  logging.info("Бот запускается...")
-  await dp.start_polling(bot)
+ try:
+  response = chat.send_message(user_text)
+  await update.message.reply_text(response.text)
+ except Exception as e:
+  logging.error(f"Ошибка при обращении к Gemini API: {e}")
+  await update.message.reply_text("Произошла ошибка, не могу сейчас ответить. Попробуй позже.")
 
-if __name__ == "__main__":
-  asyncio.run(main())
+def main() -> None:
+ """Запуск бота."""
+ logging.info("Бот запускается...")
 
+ application = Application.builder().token(BOT_TOKEN).build()
+
+ # Добавляем обработчики команд
+ application.add_handler(CommandHandler("start", start))
+ application.add_handler(CommandHandler("price", price_command)) # Эта команда теперь вызывает новую функцию
+
+ # Добавляем обработчик для всех остальных текстовых сообщений
+ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+ # Запускаем бота
+ application.run_polling()
+
+if __name__ == '__main__':
+ main()
 
 
