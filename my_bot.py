@@ -1,75 +1,71 @@
 import logging
 import os
-import google.generativeai as genai
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения из файла .env
+# Загружаем переменные окружения (нужно для токена)
 load_dotenv()
-
-# Получаем ключи из переменных окружения
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
-# Настраиваем логирование
+# Настраиваем логирование, чтобы видеть в логах Railway, что бот работает
 logging.basicConfig(
- format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
- level=logging.INFO
+  format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+  level=logging.INFO
 )
 
-# Настраиваем Gemini API
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
-chat = model.start_chat(history=[])
+# --- НАШИ КОМАНДЫ ---
 
-# --- НОВАЯ ВЕРСИЯ КОМАНДЫ /price ---
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+  """Обрабатывает команду /start."""
+  # Я немного обновил текст, так как бот больше не ИИ-собеседник
+  start_text = "Привет! Я информационный бот. Используй /help, чтобы увидеть список всех команд."
+  await update.message.reply_text(start_text)
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+  """Обрабатывает команду /help."""
+  help_text = (
+    "Здравствуйте, это бот для информации об услугах lonely. \n\n"
+    "Вот список команд:\n"
+    "• /price - узнать стоимость услуг.\n"
+    "• /subscribe - получить ссылки на наши телеграмм каналы."
+  )
+  await update.message.reply_text(help_text)
+
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
- """Отправляет статический прайс-лист."""
- price_list = (
-  "Прайс-лист на видео:\n\n"
-  "1. Изи видео - 100р\n"
-  "2. Медиум видео - 150р\n"
-  "3. Хард видео - 200р"
- )
- await update.message.reply_text(price_list)
+  """Отправляет прайс-лист по команде /price."""
+  price_list = (
+    "Прайс-лист на видео:\n\n"
+    "1. Изи видео - 100р\n"
+    "2. Медиум видео - 150р\n"
+    "3. Хард видео - 200р"
+  )
+  await update.message.reply_text(price_list)
 
-# --- Старые команды, которые остаются без изменений ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
- """Отправляет приветственное сообщение при команде /start."""
- await update.message.reply_text('Привет! Я твой AI-собеседник. Просто напиши мне что-нибудь.')
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
- """Обрабатывает все текстовые сообщения, отправляя их в Gemini."""
- user_text = update.message.text
- logging.info(f"Получено сообщение от пользователя: {user_text}")
-
- await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
-
- try:
-  response = chat.send_message(user_text)
-  await update.message.reply_text(response.text)
- except Exception as e:
-  logging.error(f"Ошибка при обращении к Gemini API: {e}")
-  await update.message.reply_text("Произошла ошибка, не могу сейчас ответить. Попробуй позже.")
+async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+  """Отправляет ссылки на каналы по команде /subscribe."""
+  subscribe_text = (
+    "Вот список наших телеграмм каналов:\n\n"
+    "https://t.me/lonelyinformati0n\n"
+    "https://t.me/lonelyn3ws"
+  )
+  await update.message.reply_text(subscribe_text)
 
 def main() -> None:
- """Запуск бота."""
- logging.info("Бот запускается...")
+  """Основная функция для запуска бота."""
+  logging.info("Бот запускается в режиме команд...")
 
- application = Application.builder().token(BOT_TOKEN).build()
+  application = Application.builder().token(BOT_TOKEN).build()
 
- # Добавляем обработчики команд
- application.add_handler(CommandHandler("start", start))
- application.add_handler(CommandHandler("price", price_command)) # Эта команда теперь вызывает новую функцию
+  # Регистрируем все наши команды
+  application.add_handler(CommandHandler("start", start_command))
+  application.add_handler(CommandHandler("help", help_command))
+  application.add_handler(CommandHandler("price", price_command))
+  application.add_handler(CommandHandler("subscribe", subscribe_command))
 
- # Добавляем обработчик для всех остальных текстовых сообщений
- application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
- # Запускаем бота
- application.run_polling()
+  # Запускаем бота
+  application.run_polling()
 
 if __name__ == '__main__':
- main()
-
+  main()
 
