@@ -27,8 +27,8 @@ def initialize_db():
  cur = con.cursor()
  cur.execute('''
  CREATE TABLE IF NOT EXISTS users (
-  chat_id INTEGER PRIMARY KEY,
-  username TEXT
+ chat_id INTEGER PRIMARY KEY,
+ username TEXT
  )
  ''')
  con.commit()
@@ -56,9 +56,8 @@ def get_all_users_with_username():
  """Возвращает список (chat_id, username) всех пользователей из БД."""
  con = sqlite3.connect('users.db')
  cur = con.cursor()
- # Извлекаем и chat_id, и username
  cur.execute("SELECT chat_id, username FROM users")
- users = cur.fetchall() # Вернет список кортежей [(id1, 'user1'), (id2, 'user2')]
+ users = cur.fetchall()
  con.close()
  return users
 
@@ -107,6 +106,7 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
  """Команда для рассылки. ДОСТУПНА ТОЛЬКО АДМИНУ."""
  user_id = str(update.effective_user.id)
  if user_id != ADMIN_ID:
+ # Вот здесь были исправлены отступы
  await update.message.reply_text("У вас нет прав для выполнения этой команды.")
  return
 
@@ -134,6 +134,7 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
  """НОВАЯ КОМАНДА: Присылает список пользователей. ДОСТУПНА ТОЛЬКО АДМИНУ."""
  user_id = str(update.effective_user.id)
  if user_id != ADMIN_ID:
+ # И здесь тоже исправлены отступы
  await update.message.reply_text("У вас нет прав для выполнения этой команды.")
  return
 
@@ -145,11 +146,9 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
  # Формируем красивое сообщение
  user_list_text = f"👥 Список пользователей в базе ({len(users_data)}):\n\n"
  for i, (chat_id, username) in enumerate(users_data, 1):
- # Если у пользователя нет юзернейма, показываем его ID
  display_name = f"@{username}" if username else f"ID: {chat_id}"
  user_list_text += f"{i}. {display_name}\n"
 
- # Отправляем сообщение
  await update.message.reply_text(user_list_text)
 
 def main() -> None:
@@ -167,11 +166,12 @@ def main() -> None:
 
  # Регистрируем админские команды
  application.add_handler(CommandHandler("broadcast", broadcast_command))
- application.add_handler(CommandHandler("listusers", list_users_command)) # <-- Добавили новую команду
+ application.add_handler(CommandHandler("listusers", list_users_command))
 
  application.run_polling()
 
 if __name__ == '__main__':
  main()
+
 
 
